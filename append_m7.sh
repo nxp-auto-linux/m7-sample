@@ -49,6 +49,21 @@ on_exit () {
 	exit 1
 }
 
+check_file () {
+	local file=$1
+
+	if [ -z "${file}" ]; then
+		echo "Error: Empty file"
+		exit 1
+	fi
+
+	if [ ! -f "${file}" ]; then
+		echo "Error: File \"$file\" does not exist"
+		exit 1
+	fi
+}
+
+
 
 # offsets for QSPI and SD/eMMC
 boot_target_off1=0x28
@@ -66,20 +81,54 @@ app_code_off=0x40
 
 uboot_off=$(roundup  $((app_header_off + app_code_off)) 512)
 
+show_usage ()
+{
+	echo -e "\n Usage: "
+	echo -e "  ${BASH_SOURCE[0]} [parameters]"
+	echo "Parameters:"
+	echo "    -i input IVT file, e.g. u-boot.s32 or fip.s32"
+	echo "    -b m7 binary file, e.g. m7.bin"
+	echo "    -m m7 map file, e.g. m7.map"
+	echo "    -o output file (optional), If skip is used <input file>.m7"
+	echo "    -h show this help"
 
-if [ "$#" -ne 3 ]; then
-	echo Invalid number of parameters
-	echo Usage:
-	echo $0 u-boot.s32 m7_binary_file m7_map_file
-	exit
+	echo "Example"
+	echo "./append_m7.sh -i u-boot.s32 -b build/m7.bin -m build/m7.map"
+}
+
+
+unset input m7_file m7_map output
+while getopts ":hi:b:m:o:" input_params
+do
+	case $input_params in
+		i) input="$OPTARG"
+			;;
+		b) m7_file="$OPTARG"
+			;;
+		m) m7_map="$OPTARG"
+			;;
+		o) output="$OPTARG"
+			;;
+		h)
+			show_usage
+			exit 1
+			;;
+		?)
+			echo Invalid option
+			show_usage
+			exit 1
+	esac
+done
+
+check_file "${input}"
+check_file "${m7_file}"
+check_file "${m7_map}"
+
+if [ -z "${output}" ]; then
+	output="${input}.m7"
 fi
 
-input="$1"
-m7_file="$2"
-m7_map="$3"
-output="${input}.m7"
 tmpfile="$(mktemp ./tmp.XXXXXX)"
-
 
 # Read M7 entry point from the map file. This is the start of VTABLE
 m7_bootloader_entry=$( get_symbol_addr "VTABLE" "${m7_map}" ) || on_exit

@@ -13,16 +13,20 @@ make CROSS_COMPILE=<armv7-cross-compiler->
 
 Appending M7 binary over an existing binary with IVT header (e.g. u-boot.s32)
 ```shell
-append_m7.sh <IVT binary> <m7 binary from this project> <m7 map file from this project>
+append_m7.sh -i <IVT binary> -b <m7 binary from this project> -m <m7 map file from this project>
 ```
 m7 binary and m7 map from this project are generated after make command described above
+For complete parameters list and description, use help option:
+```shell
+append_m7.sh -h
+```
 
 ## How to Build example:
 From the project's root folder, and having cross-compile binaries on path:
 
 ```shell
 make CROSS_COMPILE=arm-none-eabi-
-./append_m7.sh u-boot.s32 build/m7.bin build/m7.map
+./append_m7.sh -i u-boot.s32 -b build/m7.bin -m build/m7.map
 ```
 
 ## Other build options
