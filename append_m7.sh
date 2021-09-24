@@ -98,9 +98,6 @@ padding=$(( m7_bin_off - app_header_off - app_code_off ))
 ram_start=$((m7_bootloader_entry - padding))
 
 
-blob_size=$(stat --printf=%s "${input}")
-blob_size=$(roundup $((blob_size - uboot_off + padding + m7_bin_size)) 512)
-
 rm -f "${output}"
 # write from input file until uboot_off
 dd of="${output}" if="${input}" bs=1 conv=notrunc seek=0 skip=0 count=$(hex2dec $uboot_off) status=none
@@ -118,7 +115,12 @@ int2bin $m7_bootloader_entry | dd of="${output}" bs=1 conv=notrunc seek=$(hex2de
 # update Ram start
 int2bin $ram_start | dd of="${output}" bs=1 conv=notrunc seek=$(hex2dec $((app_header_off + app_start_off))) status=none
 
-# update size
+# read the original app code size from IVT header
+blob_size=0x$(hexdump -n 4 -e '"%02X"' -s $((app_header_off + app_size_off)) ${output})
+# update the size adding the newly added M7 binary size
+# Note: the size should not be computed based on binary (u-boot.bin or fip.bin) size. This works for
+# U-Boot, but not for fip.bin where only BL2 size is counted in IVT header
+blob_size=$((blob_size + m7_bin_size))
 int2bin $blob_size | dd of="${output}" bs=1 conv=notrunc seek=$(hex2dec $((app_header_off + app_size_off))) status=none
 
 # write M7 bootloader
@@ -149,6 +151,6 @@ echo
 echo "If you need to update u-boot.bin on the resulting image ("${output}")"
 echo "run the following command:"
 echo
-echo dd of="${output}" if=u-boot.bin bs=1 conv=notrunc seek=$(hex2dec $uboot_off_new)
+echo dd of="${output}" if=\<u-boot or fip\>.bin bs=1 conv=notrunc seek=$(hex2dec $uboot_off_new)
 echo
 
