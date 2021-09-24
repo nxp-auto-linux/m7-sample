@@ -8,9 +8,11 @@ OUTPUT_FORMAT("elf32-littlearm", "elf32-littlearm", "elf32-littlearm")
 OUTPUT_ARCH(arm)
 ENTRY(_start)
 
+START_ADDR = 0x3408E000;
+
 SECTIONS
 {
- . = 0x3408E000;
+ . = START_ADDR;
  . = ALIGN(128); /* VTOR must be aligned to 128 bytes */
  .vtable :
  {
@@ -27,8 +29,8 @@ SECTIONS
   *(.text*)
  }
 
- _stack_end = 0x3408F000;
- _stack_start = 0x34090000;
+ _stack_end = START_ADDR + 0x1000;
+ _stack_start = START_ADDR + 0x2000;
 
  /DISCARD/ : { *(.dynsym) }
  /DISCARD/ : { *(.dynstr*) }
