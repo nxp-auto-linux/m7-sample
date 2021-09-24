@@ -81,6 +81,18 @@ app_code_off=0x40
 
 uboot_off=$(roundup  $((app_header_off + app_code_off)) 512)
 
+# Size needed for M7: code + stack.
+m7_bin_size=0x2000
+
+
+# M7 binary offset in the IVT binary
+# M7 binary replaces the U-Boot binary in IVT, while U-Boot is shifted with
+# the M7 size
+m7_bin_off=$uboot_off
+uboot_off_new=$((uboot_off + m7_bin_size))
+
+padding=$(( m7_bin_off - app_header_off - app_code_off ))
+
 show_usage ()
 {
 	echo -e "\n Usage: "
@@ -90,6 +102,7 @@ show_usage ()
 	echo "    -b m7 binary file, e.g. m7.bin"
 	echo "    -m m7 map file, e.g. m7.map"
 	echo "    -o output file (optional), If skip is used <input file>.m7"
+	echo "    -e show expected M7 entry point (optional). -b and -m are optional when using -e"
 	echo "    -h show this help"
 
 	echo "Example"
@@ -97,8 +110,8 @@ show_usage ()
 }
 
 
-unset input m7_file m7_map output
-while getopts ":hi:b:m:o:" input_params
+unset input m7_file m7_map output show_expected_ep
+while getopts ":hi:b:m:o:e" input_params
 do
 	case $input_params in
 		i) input="$OPTARG"
@@ -108,6 +121,8 @@ do
 		m) m7_map="$OPTARG"
 			;;
 		o) output="$OPTARG"
+			;;
+		e) show_expected_ep="true"
 			;;
 		h)
 			show_usage
@@ -121,6 +136,15 @@ do
 done
 
 check_file "${input}"
+
+ram_start_orig=0x$(hexdump -n 4 -e '"%02X"' -s $((app_header_off + app_start_off)) ${input})
+expected_ep=$((ram_start_orig + padding - m7_bin_size))
+
+if test "${show_expected_ep}"; then
+	printf "0x%x\n" "${expected_ep}"
+	exit 0
+fi
+
 check_file "${m7_file}"
 check_file "${m7_map}"
 
@@ -133,17 +157,6 @@ tmpfile="$(mktemp ./tmp.XXXXXX)"
 # Read M7 entry point from the map file. This is the start of VTABLE
 m7_bootloader_entry=$( get_symbol_addr "VTABLE" "${m7_map}" ) || on_exit
 
-# Size needed for M7: code + stack.
-m7_bin_size=0x2000
-
-
-# M7 binary offset in the IVT binary
-# M7 binary replaces the U-Boot binary in IVT, while U-Boot is shifted with
-# the M7 size
-m7_bin_off=$uboot_off
-uboot_off_new=$((uboot_off + m7_bin_size))
-
-padding=$(( m7_bin_off - app_header_off - app_code_off ))
 ram_start=$((m7_bootloader_entry - padding))
 
 
@@ -154,6 +167,15 @@ dd of="${output}" if="${input}" bs=1 conv=notrunc seek=0 skip=0 count=$(hex2dec 
 # update boot target. M7 boot_target -> 0x0
 printf \\x00 | dd of="${output}" bs=1 conv=notrunc seek=$(hex2dec $boot_target_off1) status=none
 printf \\x00 | dd of="${output}" bs=1 conv=notrunc seek=$(hex2dec $boot_target_off2) status=none
+
+
+if [ "$((ram_start_orig - m7_bin_size))" -eq "$ram_start" ]; then
+	printf "Checking M7 entry point versus IVT memory layout: OK\n"
+else
+	printf "Error: \tM7 entry point is not correctly set to work with IVT %s\n" "${input}"
+	printf "\tCurrent M7 entry point is 0x%x, while expected is 0x%x\n" ${m7_bootloader_entry} ${expected_ep}
+	exit 1
+fi
 
 # save the original entry point (A53 entry point)
 dd of="${tmpfile}" if="${output}" bs=1 count=4 skip=$(hex2dec $((app_header_off + app_entry_off))) status=none
