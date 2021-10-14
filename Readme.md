@@ -49,8 +49,7 @@ during `./append_m7.sh` execution if the address doesn't match the one specified
 ## Other build options
 
 By default, M7 boots with A53 lockstep enabled.
-To disable A53 lockstep, the flag DISABLE_A53_LOCKSTEP should be defined, by appending
+To disable A53 lockstep, the flag DISABLE_A53_LOCKSTEP should be added to `make` command.
 ```shell
--DDISABLE_A53_LOCKSTEP
+make DISABLE_A53_LOCKSTEP=1
 ```
-to CFLAGS variable
