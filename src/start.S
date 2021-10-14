@@ -78,6 +78,7 @@ _start:
 	bl main
 
 _end:
+	wfi
 	b _end
 
 _nmi:
