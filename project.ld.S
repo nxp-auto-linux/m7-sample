@@ -8,7 +8,11 @@ OUTPUT_FORMAT("elf32-littlearm", "elf32-littlearm", "elf32-littlearm")
 OUTPUT_ARCH(arm)
 ENTRY(_start)
 
+#ifdef CUSTOM_START_ADDR
+START_ADDR = CUSTOM_START_ADDR;
+#else
 START_ADDR = 0x3408E000;
+#endif
 
 SECTIONS
 {

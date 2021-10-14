@@ -4,21 +4,30 @@
 # Copyright 2021 NXP
 #
 
-CFLAGS := -g -mcpu=cortex-m7 -mthumb -mlittle-endian -fomit-frame-pointer -Wall -Iinclude
-ASFLAGS := $(CFLAGS)
-LDFLAGS := -pie -Bstatic  --no-dynamic-linker -T project.lds
+CFLAGS = -g -mcpu=cortex-m7 -mthumb -mlittle-endian -fomit-frame-pointer -Wall -Iinclude
+
+BUILD := build
+LINKER_FILE := $(BUILD)/project.ld
+LDFLAGS := -pie -Bstatic  --no-dynamic-linker -T $(LINKER_FILE)
 
 CC := $(CROSS_COMPILE)gcc
 LD := $(CROSS_COMPILE)ld
 OBJCOPY:= $(CROSS_COMPILE)objcopy
 OBJDUMP:= $(CROSS_COMPILE)objdump
 
-BUILD := build
-
 SOURCE := $(wildcard src/*.c)
 SOURCE += $(wildcard src/*.S)
 OBJ := $(filter %.o,$(patsubst src/%.c,$(BUILD)/%.o,$(SOURCE)) \
 	+       $(patsubst src/%.S,$(BUILD)/%.o,$(SOURCE)))
+
+ifdef START_ADDR
+CFLAGS += -DCUSTOM_START_ADDR=$(START_ADDR)
+endif
+
+ASFLAGS := $(CFLAGS)
+
+$(BUILD)/%.ld: %.ld.S
+	$(CC) -E -P $(CFLAGS) -o $@ $<
 
 $(BUILD)/%.o: src/%.S
 	$(CC) $(ASFLAGS) -c -o $@ $<
@@ -30,7 +39,7 @@ $(BUILD)/%.o: src/%.c
 
 all: builddir $(BUILD)/m7.elf
 
-$(BUILD)/m7.elf: $(OBJ)
+$(BUILD)/m7.elf: $(OBJ) $(LINKER_FILE)
 	$(LD) $(LDFLAGS) -Map=$(BUILD)/m7.map -o $@ $(OBJ)
 	$(OBJCOPY) -j .vtable -j .data -j .text -O binary $(BUILD)/m7.elf $(BUILD)/m7.bin
 	$(OBJDUMP) -D $(BUILD)/m7.elf > $(BUILD)/m7.dump
