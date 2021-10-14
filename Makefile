@@ -21,10 +21,10 @@ OBJ := $(filter %.o,$(patsubst src/%.c,$(BUILD)/%.o,$(SOURCE)) \
 	+       $(patsubst src/%.S,$(BUILD)/%.o,$(SOURCE)))
 
 $(BUILD)/%.o: src/%.S
-	$(CC) $(CFLAGS) -c -o $@ $<
+	$(CC) $(ASFLAGS) -c -o $@ $<
 
 $(BUILD)/%.o: src/%.c
-	$(CC) $(ASFLAGS) -c -o $@ $<
+	$(CC) $(CFLAGS) -c -o $@ $<
 
 .PHONY: all
 
