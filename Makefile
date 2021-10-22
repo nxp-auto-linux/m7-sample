@@ -46,7 +46,7 @@ all: $(BUILD) $(A53_BOOTLOADER_OUT)
 
 compile: $(BUILD) $(ELF)
 
-$(A53_BOOTLOADER_OUT): $(A53_BOOTLOADER) $(ELF)
+$(A53_BOOTLOADER_OUT): $(A53_BOOTLOADER) cleanlinker $(ELF)
 	@printf "  [APP]\t$@ <- $<\n"
 	@$(CURDIR)/append_m7.sh -i $< -b $(ELF_BIN) -m $(ELF_MAP)
 
@@ -71,6 +71,10 @@ $(ELF): $(OBJ) $(LINKER_FILE)
 $(BUILD):
 	@printf "  [MK]\t$(BUILD)\n"
 	@mkdir -p $(BUILD)
+
+cleanlinker:
+	@printf "  [RM]\t$(LINKER_FILE)\n"
+	@rm -f $(LINKER_FILE)
 
 clean:
 	@printf "  [RM]\t$(BUILD)\n"
