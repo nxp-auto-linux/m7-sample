@@ -111,7 +111,7 @@ static void enable_a53(void)
 	writel (MC_ME_CTL_KEY_ADDR, MC_ME_CTL_KEY_INVERTED_VALUE);
 
 	/* wait for clock to be enabled */
-	while ((readl(MC_ME_PRTN_N_CORE_M_STAT(partition, core_id)) &&
+	while ((readl(MC_ME_PRTN_N_CORE_M_STAT(partition, core_id)) &
 		MC_ME_CORE_CLOCK_STAT_MASK) != 1)
 		;
 
