@@ -193,11 +193,11 @@ ram_start=$((m7_bootloader_entry - padding))
 
 rm -f "${output}"
 # write from input file until uboot_off
-dd of="${output}" if="${input}" bs=1 conv=notrunc seek=0 skip=0 count=$(hex2dec $uboot_off) status=none
+dd of="${output}" if="${input}" conv=notrunc seek=0 skip=0 count=$(hex2dec $uboot_off) status=none iflag=count_bytes
 
 # update boot target. M7 boot_target -> 0x0
-printf \\x00 | dd of="${output}" bs=1 conv=notrunc seek=$(hex2dec $boot_target_off1) status=none
-printf \\x00 | dd of="${output}" bs=1 conv=notrunc seek=$(hex2dec $boot_target_off2) status=none
+printf \\x00 | dd of="${output}" conv=notrunc seek=$(hex2dec $boot_target_off1) status=none oflag=seek_bytes
+printf \\x00 | dd of="${output}" conv=notrunc seek=$(hex2dec $boot_target_off2) status=none oflag=seek_bytes
 
 
 if [ "$((ram_start_orig - m7_bin_size))" -eq "$ram_start" ]; then
@@ -209,7 +209,7 @@ else
 fi
 
 # save the original entry point (A53 entry point)
-dd of="${tmpfile}" if="${output}" bs=1 count=4 skip=$(hex2dec $((app_header_off + app_entry_off))) status=none
+dd of="${tmpfile}" if="${output}" count=4 skip=$(hex2dec $((app_header_off + app_entry_off))) status=none iflag=skip_bytes,count_bytes
 
 # update entry point
 int2bin $m7_bootloader_entry | dd of="${output}" bs=1 conv=notrunc seek=$(hex2dec $((app_header_off + app_entry_off))) status=none
@@ -226,7 +226,7 @@ blob_size=$((blob_size + m7_bin_size))
 int2bin $blob_size | dd of="${output}" bs=1 conv=notrunc seek=$(hex2dec $((app_header_off + app_size_off))) status=none
 
 # write M7 bootloader
-dd of="${output}" if="${m7_file}" bs=1 conv=notrunc seek=$(hex2dec $m7_bin_off) status=none
+dd of="${output}" if="${m7_file}" conv=notrunc seek=$(hex2dec $m7_bin_off) status=none oflag=seek_bytes
 
 # restore the original A53 entry point into the M7 binary
 # The A53 entry point is located in .data section in symbol a53_entry_point
@@ -235,11 +235,11 @@ dd of="${output}" if="${m7_file}" bs=1 conv=notrunc seek=$(hex2dec $m7_bin_off) 
 a53_entry_point_addr=$( get_symbol_addr "a53_entry_point" "${m7_map}" ) || on_exit
 a53_entry_point_offset=$((a53_entry_point_addr - m7_bootloader_entry))
 
-dd of="${output}" if="${tmpfile}" bs=1 count=4 conv=notrunc seek=$(hex2dec $((m7_bin_off + a53_entry_point_offset))) status=none
+dd of="${output}" if="${tmpfile}" count=4 conv=notrunc seek=$(hex2dec $((m7_bin_off + a53_entry_point_offset))) status=none oflag=seek_bytes
 rm "${tmpfile}"
 
 # write u-boot from original file to the new offset
-dd of="${output}" if="${input}" bs=1 conv=notrunc seek=$(hex2dec $uboot_off_new) skip=$(hex2dec $uboot_off) status=none
+dd of="${output}" if="${input}" conv=notrunc seek=$(hex2dec $uboot_off_new) skip=$(hex2dec $uboot_off) status=none oflag=seek_bytes iflag=skip_bytes
 
 
 printf 'M7 Entry point   = 0x%x\n' $m7_bootloader_entry
@@ -253,6 +253,6 @@ echo
 echo "If you need to update u-boot.bin on the resulting image ("${output}")"
 echo "run the following command:"
 echo
-echo dd of="${output}" if=\<u-boot or fip\>.bin bs=1 conv=notrunc seek=$(hex2dec $uboot_off_new)
+echo dd of="${output}" if=\<u-boot or fip\>.bin conv=notrunc seek=$(hex2dec $uboot_off_new) oflag=seek_bytes
 echo
 
