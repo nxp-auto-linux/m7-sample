@@ -63,35 +63,49 @@ check_file () {
 	fi
 }
 
+get_u32_val () {
+	local file="$1"
+	local offset="$2"
+	printf "0x%s" $(od --address-radix=n --format=x4 --skip-bytes="$offset" --read-bytes=4 "$file")
+}
 
+get_ivt_offset () {
+	local file="$1"
+	local ivt_token="0x600001d1"
+	local qspi_offset="0x0"
+	local sd_offset="0x1000"
+	local qspi_ivt_token="$(get_u32_val "$file" "$qspi_offset")"
+	local sd_ivt_token="$(get_u32_val "$file" "$sd_offset")"
+
+	if [ "$qspi_ivt_token" = "$ivt_token" ]
+	then
+		echo "$qspi_offset"
+		return
+	fi
+
+	if [ "$sd_ivt_token" = "$ivt_token" ]
+	then
+		echo "$sd_offset"
+		return
+	fi
+
+	>&2 echo "Failed to detect IVT offset"
+}
 
 # offsets for QSPI and SD/eMMC
 boot_target_off1=0x28
 boot_target_off2=0x1028
 
-# this is the value read from offset 0x20/0x1020
-# for Linux BSP it is always used 0x3200. Use this hard-coded.
-app_header_off=0x3200
-
 # offsets relative to IVT's Application Boot header
 app_start_off=0x4
 app_entry_off=0x8
 app_size_off=0xC
+app_boot_header_off=0x20
 app_code_off=0x40
 
-uboot_off=$(roundup  $((app_header_off + app_code_off)) 512)
 
 # Size needed for M7: code + stack.
 m7_bin_size=0x2000
-
-
-# M7 binary offset in the IVT binary
-# M7 binary replaces the U-Boot binary in IVT, while U-Boot is shifted with
-# the M7 size
-m7_bin_off=$uboot_off
-uboot_off_new=$((uboot_off + m7_bin_size))
-
-padding=$(( m7_bin_off - app_header_off - app_code_off ))
 
 show_usage ()
 {
@@ -137,7 +151,24 @@ done
 
 check_file "${input}"
 
-ram_start_orig=0x$(hexdump -n 4 -e '"%02X"' -s $((app_header_off + app_start_off)) ${input})
+ivt_header_off=$(get_ivt_offset "${input}")
+if [ -z "$ivt_header_off" ]
+then
+	exit 1
+fi
+app_header_off=$(get_u32_val "${input}" $((ivt_header_off + app_boot_header_off)))
+uboot_off=$((app_header_off + app_code_off))
+
+# M7 binary offset in the IVT binary
+# M7 binary replaces the U-Boot binary in IVT, while U-Boot is shifted with
+# the M7 size
+m7_bin_off=$uboot_off
+uboot_off_new=$((uboot_off + m7_bin_size))
+
+padding=$(( m7_bin_off - app_header_off - app_code_off ))
+
+ram_start_orig=$(get_u32_val "${input}" $((app_header_off + app_start_off)))
+
 expected_ep=$((ram_start_orig + padding - m7_bin_size))
 
 if test "${show_expected_ep}"; then
@@ -187,7 +218,7 @@ int2bin $m7_bootloader_entry | dd of="${output}" bs=1 conv=notrunc seek=$(hex2de
 int2bin $ram_start | dd of="${output}" bs=1 conv=notrunc seek=$(hex2dec $((app_header_off + app_start_off))) status=none
 
 # read the original app code size from IVT header
-blob_size=0x$(hexdump -n 4 -e '"%02X"' -s $((app_header_off + app_size_off)) ${output})
+blob_size=$(get_u32_val "${output}" $((app_header_off + app_size_off)))
 # update the size adding the newly added M7 binary size
 # Note: the size should not be computed based on binary (u-boot.bin or fip.bin) size. This works for
 # U-Boot, but not for fip.bin where only BL2 size is counted in IVT header
