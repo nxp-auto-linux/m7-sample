@@ -92,17 +92,15 @@ get_ivt_offset () {
 	>&2 echo "Failed to detect IVT offset"
 }
 
-# offsets for QSPI and SD/eMMC
-boot_target_off1=0x28
-boot_target_off2=0x1028
+# IVT header offsets
+app_boot_header_off=0x20
+boot_cfg_off=0x28
 
-# offsets relative to IVT's Application Boot header
+# Application Boot header offsets
 app_start_off=0x4
 app_entry_off=0x8
 app_size_off=0xC
-app_boot_header_off=0x20
 app_code_off=0x40
-
 
 # Size needed for M7: code + stack.
 m7_bin_size=0x2000
@@ -156,6 +154,10 @@ if [ -z "$ivt_header_off" ]
 then
 	exit 1
 fi
+
+# offsets for QSPI and SD/eMMC
+boot_target_off=$((ivt_header_off + boot_cfg_off))
+
 app_header_off=$(get_u32_val "${input}" $((ivt_header_off + app_boot_header_off)))
 uboot_off=$((app_header_off + app_code_off))
 
@@ -196,8 +198,7 @@ rm -f "${output}"
 dd of="${output}" if="${input}" conv=notrunc seek=0 skip=0 count=$(hex2dec $uboot_off) status=none iflag=count_bytes
 
 # update boot target. M7 boot_target -> 0x0
-printf \\x00 | dd of="${output}" conv=notrunc seek=$(hex2dec $boot_target_off1) status=none oflag=seek_bytes
-printf \\x00 | dd of="${output}" conv=notrunc seek=$(hex2dec $boot_target_off2) status=none oflag=seek_bytes
+printf \\x00 | dd of="${output}" conv=notrunc seek=$(hex2dec $boot_target_off) status=none oflag=seek_bytes
 
 
 if [ "$((ram_start_orig - m7_bin_size))" -eq "$ram_start" ]; then
