@@ -186,6 +186,7 @@ if [ -z "${output}" ]; then
 fi
 
 tmpfile="$(mktemp ./tmp.XXXXXX)"
+trap 'rm -f "$tmpfile"' EXIT
 
 # Read M7 entry point from the map file. This is the start of VTABLE
 m7_bootloader_entry=$( get_symbol_addr "VTABLE" "${m7_map}" ) || on_exit
@@ -237,7 +238,6 @@ a53_entry_point_addr=$( get_symbol_addr "a53_entry_point" "${m7_map}" ) || on_ex
 a53_entry_point_offset=$((a53_entry_point_addr - m7_bootloader_entry))
 
 dd of="${output}" if="${tmpfile}" count=4 conv=notrunc seek=$(hex2dec $((m7_bin_off + a53_entry_point_offset))) status=none oflag=seek_bytes
-rm "${tmpfile}"
 
 # write u-boot from original file to the new offset
 dd of="${output}" if="${input}" conv=notrunc seek=$(hex2dec $uboot_off_new) skip=$(hex2dec $uboot_off) status=none oflag=seek_bytes iflag=skip_bytes
