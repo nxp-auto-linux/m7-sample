@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier:     BSD-3-Clause
 #
-# Copyright 2021 NXP
+# Copyright 2021-2022 NXP
 #
 # This script create a bootable binary image containing both U-Boot and M7
 # bootloader with the boot target being M7. The following steps are performed:
@@ -92,6 +92,9 @@ get_ivt_offset () {
 	>&2 echo "Failed to detect IVT offset"
 }
 
+# M7 VTABLE must be aligned to 128 bytes
+VTABLE_ALIGN=128
+
 # IVT header offsets
 app_boot_header_off=0x20
 boot_cfg_off=0x28
@@ -167,11 +170,13 @@ uboot_off=$((app_header_off + app_code_off))
 m7_bin_off=$uboot_off
 uboot_off_new=$((uboot_off + m7_bin_size))
 
-padding=$(( m7_bin_off - app_header_off - app_code_off ))
-
 ram_start_orig=$(get_u32_val "${input}" $((app_header_off + app_start_off)))
 
-expected_ep=$((ram_start_orig + padding - m7_bin_size))
+ram_start=$((ram_start_orig - m7_bin_size))
+# Align to VTABLE_ALIGN
+expected_ep=$(roundup $ram_start $VTABLE_ALIGN)
+m7_bin_padding=$((expected_ep - ram_start))
+m7_bin_off=$((m7_bin_off + m7_bin_padding))
 
 if test "${show_expected_ep}"; then
 	printf "0x%x\n" "${expected_ep}"
@@ -191,9 +196,6 @@ trap 'rm -f "$tmpfile"' EXIT
 # Read M7 entry point from the map file. This is the start of VTABLE
 m7_bootloader_entry=$( get_symbol_addr "VTABLE" "${m7_map}" ) || on_exit
 
-ram_start=$((m7_bootloader_entry - padding))
-
-
 rm -f "${output}"
 # write from input file until uboot_off
 dd of="${output}" if="${input}" conv=notrunc seek=0 skip=0 count=$(hex2dec $uboot_off) status=none iflag=count_bytes
@@ -202,7 +204,7 @@ dd of="${output}" if="${input}" conv=notrunc seek=0 skip=0 count=$(hex2dec $uboo
 printf \\x00 | dd of="${output}" conv=notrunc seek=$(hex2dec $boot_target_off) status=none oflag=seek_bytes
 
 
-if [ "$((ram_start_orig - m7_bin_size))" -eq "$ram_start" ]; then
+if [ "$(printf "%d" $m7_bootloader_entry)" -eq "$(printf "%d"  $expected_ep)" ]; then
 	printf "Checking M7 entry point versus IVT memory layout: OK\n"
 else
 	printf "Error: \tM7 entry point is not correctly set to work with IVT %s\n" "${input}"
