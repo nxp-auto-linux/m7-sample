@@ -14,22 +14,16 @@ make CROSS_COMPILE=<armv7-cross-compiler-> compile
 ## How to Build example:
 From the project's root folder, and having cross-compile binaries on path:
 
-### U-Boot
-```shell
-make CROSS_COMPILE=arm-none-eabi- A53_BOOTLOADER=u-boot.s32
-```
-
-Above commands will generate `u-boot.s32.m7` file which has to be placed on SDCard instead of
-usual `u-boot.s32`.
-
 ### ARM Trusted Firmware
 ```shell
 make CROSS_COMPILE=arm-none-eabi- A53_BOOTLOADER=fip.s32
 ```
+Above commands will generate `fip.s32.m7` file which has to be placed on SDCard instead of
+usual `fip.s32`.
 
 >**Note**
 > Don't forget to leave some space for this bootloader when compiling A-TF. This is usually done
-> using **FIP_MMC_OFFSET=0x5400** compilation parameter.
+> using **FIP_OFFSET_DELTA=0x2000** compilation parameter.
 
 ## Other build options
 

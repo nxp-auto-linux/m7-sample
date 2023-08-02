@@ -27,7 +27,7 @@ ELF_DUMP := $(patsubst %.elf,%.dump, $(ELF))
 ifeq (,$(findstring clean,$(MAKECMDGOALS))$(findstring compile,$(MAKECMDGOALS)))
 ifeq ("$(wildcard $(A53_BOOTLOADER))","")
 $(error "Please specify the bootloader binary using A53_BOOTLOADER argument.\
-	E.g.: make A53_BOOTLOADER=u-boot.s32")
+	E.g.: make A53_BOOTLOADER=fip.s32")
 endif
 
 CFLAGS += -DCUSTOM_START_ADDR=$(shell $(CURDIR)/append_m7.sh -e -i $(A53_BOOTLOADER))

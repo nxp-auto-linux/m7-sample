@@ -4,14 +4,14 @@
 #
 # Copyright 2021-2022 NXP
 #
-# This script create a bootable binary image containing both U-Boot and M7
+# This script create a bootable binary image containing both TF-A and M7
 # bootloader with the boot target being M7. The following steps are performed:
-# - take a standard u-boot.s32 image
+# - take a standard fip.s32 image
 # - modify IVT header to set boot_target = M7
 # - modify IVT header to set the start address
 # - modify IVT header to set the new length
 # - add the M7 binary to the configured offset
-# With these settings, both U-Boot binary and M7 bootloader binary  are copied
+# With these settings, both TF-A binary and M7 bootloader binary  are copied
 # to SRAM, and M7 is the boot target.
 #
 
@@ -113,7 +113,7 @@ show_usage ()
 	echo -e "\n Usage: "
 	echo -e "  ${BASH_SOURCE[0]} [parameters]"
 	echo "Parameters:"
-	echo "    -i input IVT file, e.g. u-boot.s32 or fip.s32"
+	echo "    -i input IVT file, e.g. fip.s32"
 	echo "    -b m7 binary file, e.g. m7.bin"
 	echo "    -m m7 map file, e.g. m7.map"
 	echo "    -o output file (optional), If skip is used <input file>.m7"
@@ -121,7 +121,7 @@ show_usage ()
 	echo "    -h show this help"
 
 	echo "Example"
-	echo "./append_m7.sh -i u-boot.s32 -b build/m7.bin -m build/m7.map"
+	echo "./append_m7.sh -i fip.s32 -b build/m7.bin -m build/m7.map"
 }
 
 
@@ -162,13 +162,13 @@ fi
 boot_target_off=$((ivt_header_off + boot_cfg_off))
 
 app_header_off=$(get_u32_val "${input}" $((ivt_header_off + app_boot_header_off)))
-uboot_off=$((app_header_off + app_code_off))
+fip_off=$((app_header_off + app_code_off))
 
 # M7 binary offset in the IVT binary
-# M7 binary replaces the U-Boot binary in IVT, while U-Boot is shifted with
+# M7 binary replaces the fip.bin binary in IVT, while fip.bin is shifted with
 # the M7 size
-m7_bin_off=$uboot_off
-uboot_off_new=$((uboot_off + m7_bin_size))
+m7_bin_off=$fip_off
+fip_off_new=$((fip_off + m7_bin_size))
 
 ram_start_orig=$(get_u32_val "${input}" $((app_header_off + app_start_off)))
 
@@ -197,8 +197,8 @@ trap 'rm -f "$tmpfile"' EXIT
 m7_bootloader_entry=$( get_symbol_addr "VTABLE" "${m7_map}" ) || on_exit
 
 rm -f "${output}"
-# write from input file until uboot_off
-dd of="${output}" if="${input}" conv=notrunc seek=0 skip=0 count=$(hex2dec $uboot_off) status=none iflag=count_bytes
+# write from input file until fip_off
+dd of="${output}" if="${input}" conv=notrunc seek=0 skip=0 count=$(hex2dec $fip_off) status=none iflag=count_bytes
 
 # update boot target. M7 boot_target -> 0x0
 printf \\x00 | dd of="${output}" conv=notrunc seek=$(hex2dec $boot_target_off) status=none oflag=seek_bytes
@@ -224,8 +224,7 @@ int2bin $ram_start | dd of="${output}" bs=1 conv=notrunc seek=$(hex2dec $((app_h
 # read the original app code size from IVT header
 blob_size=$(get_u32_val "${output}" $((app_header_off + app_size_off)))
 # update the size adding the newly added M7 binary size
-# Note: the size should not be computed based on binary (u-boot.bin or fip.bin) size. This works for
-# U-Boot, but not for fip.bin where only BL2 size is counted in IVT header
+# Note: the size should not be computed based on binary (fip.bin) size.
 blob_size=$((blob_size + m7_bin_size))
 int2bin $blob_size | dd of="${output}" bs=1 conv=notrunc seek=$(hex2dec $((app_header_off + app_size_off))) status=none
 
@@ -241,8 +240,8 @@ a53_entry_point_offset=$((a53_entry_point_addr - m7_bootloader_entry))
 
 dd of="${output}" if="${tmpfile}" count=4 conv=notrunc seek=$(hex2dec $((m7_bin_off + a53_entry_point_offset))) status=none oflag=seek_bytes
 
-# write u-boot from original file to the new offset
-dd of="${output}" if="${input}" conv=notrunc seek=$(hex2dec $uboot_off_new) skip=$(hex2dec $uboot_off) status=none oflag=seek_bytes iflag=skip_bytes
+# write FIP from original file to the new offset
+dd of="${output}" if="${input}" conv=notrunc seek=$(hex2dec $fip_off_new) skip=$(hex2dec $fip_off) status=none oflag=seek_bytes iflag=skip_bytes
 
 
 printf 'M7 Entry point   = 0x%x\n' $m7_bootloader_entry
@@ -250,12 +249,12 @@ printf 'A53 entry offset = 0x%x\n' $a53_entry_point_offset
 printf 'RAM start        = 0x%x\n' $ram_start
 printf 'App code size    = 0x%x\n' $blob_size
 
-# How to update u-boot into the generated image:
-# - write u-boot.bin at new offset
+# How to update FIP into the generated image:
+# - write fip.bin at new offset
 echo
-echo "If you need to update u-boot.bin on the resulting image ("${output}")"
+echo "If you need to update fip.bin on the resulting image ("${output}")"
 echo "run the following command:"
 echo
-echo dd of="${output}" if=\<u-boot or fip\>.bin conv=notrunc seek=$(hex2dec $uboot_off_new) oflag=seek_bytes
+echo dd of="${output}" if=\<fip.bin\> conv=notrunc seek=$(hex2dec $fip_off_new) oflag=seek_bytes
 echo
 
